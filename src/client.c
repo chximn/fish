@@ -12,7 +12,7 @@
 
 #define COMMAND_TERMINAL_SIZE 0x00
 
-struct fish f;
+struct fish_t f;
 bool done = false;
 bool init = false;
 struct terminal_t terminal;
@@ -52,7 +52,7 @@ void start_shell(struct mg_connection *c) {
 	pthread_create(&thread, NULL, __term_out2conn_thread, c);
 }
 
-void handle_packet(struct fish_packet * packet) {
+void handle_packet(struct fish_packet_t * packet) {
 	if (packet->channel == CHANNEL_SHELL) {
 		paper_size_t sz;
 		if (!paper_write(terminal.in, packet->data, packet->data_size, &sz) || sz < packet->data_size) {
@@ -99,10 +99,10 @@ static void fn(struct mg_connection *c, int ev, void *ev_data, void *fn_data) {
 		if (!init) printf("fd not initialized!\n");
 		else {
 
-			struct fish_packets * packets = fish_recv(&f, c->recv.buf, c->recv.len);
+			struct fish_packets_t * packets = fish_recv(&f, c->recv.buf, c->recv.len);
 
-			for (struct fish_packets * current = packets; current != NULL; current = current->next) {
-				struct fish_packet * packet = current->packet;
+			for (struct fish_packets_t * current = packets; current != NULL; current = current->next) {
+				struct fish_packet_t * packet = current->packet;
 
 				handle_packet(packet);
 			}

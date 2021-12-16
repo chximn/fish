@@ -12,10 +12,10 @@ all: $(BUILD) $(BUILD)/client $(BUILD)/server
 $(BUILD):
 	mkdir -p $@
 
-$(BUILD)/server: src/server.c $(BUILD)/mongoose.o $(BUILD)/paper.o $(BUILD)/terminal.o
+$(BUILD)/server: src/server.c $(BUILD)/mongoose.o $(BUILD)/paper.o $(BUILD)/terminal.o $(BUILD)/fish.o
 	$(CC) -o $@ $^ $(ARCH) $(LIBS) $(INCLUDE) $(LINK_FLAGS)
 
-$(BUILD)/client: src/client.c $(BUILD)/mongoose.o $(BUILD)/paper.o $(BUILD)/terminal.o
+$(BUILD)/client: src/client.c $(BUILD)/mongoose.o $(BUILD)/paper.o $(BUILD)/terminal.o $(BUILD)/fish.o
 	$(CC) -o $@ $^ $(ARCH) $(LIBS) $(INCLUDE) $(LINK_FLAGS)
 
 $(BUILD)/mongoose.o: src/mongoose.c
@@ -25,6 +25,9 @@ $(BUILD)/terminal.o: src/terminal.c
 	$(CC) -c -o $@ $^ $(ARCH) $(INCLUDE)
 
 $(BUILD)/paper.o: src/paper.c
+	$(CC) -c -o $@ $^ $(ARCH) $(INCLUDE)
+
+$(BUILD)/fish.o: src/fish.c
 	$(CC) -c -o $@ $^ $(ARCH) $(INCLUDE)
 
 clean: 

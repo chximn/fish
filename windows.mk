@@ -16,7 +16,7 @@ $(BUILD):
 $(LIB)/libwinpty.a:
 	make -j 8 -f winpty.mk
 
-$(BUILD)/client.exe: src/client.c $(BUILD)/mongoose.o $(BUILD)/paper.o $(BUILD)/terminal.o $(LIB)/libwinpty.a
+$(BUILD)/client.exe: src/client.c $(BUILD)/mongoose.o $(BUILD)/paper.o $(BUILD)/terminal.o $(BUILD)/fish.o $(LIB)/libwinpty.a
 	$(CC) -o $@ $^ $(LIBS) $(INCLUDE) $(ARCH) $(LINK_FLAGS)
 
 $(BUILD)/mongoose.o: src/mongoose.c
@@ -26,6 +26,9 @@ $(BUILD)/terminal.o: src/terminal.c
 	$(CC) -c -o $@ $^ $(ARCH) $(INCLUDE)
 
 $(BUILD)/paper.o: src/paper.c
+	$(CC) -c -o $@ $^ $(ARCH) $(INCLUDE)
+
+$(BUILD)/fish.o: src/fish.c
 	$(CC) -c -o $@ $^ $(ARCH) $(INCLUDE)
 
 clean:

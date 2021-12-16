@@ -21,7 +21,7 @@
 
 bool done = false;
 struct mg_connection * connection = NULL;
-struct fish f;
+struct fish_t f;
 
 void * __stdin2conn_thread(void * args) {
 	struct mg_connection * c = (struct mg_connection *) args;
@@ -80,10 +80,10 @@ static void fn(struct mg_connection *c, int ev, void *ev_data, void *fn_data) {
 	}
 	
 	else if (ev == MG_EV_READ) {
-		struct fish_packets * packets = fish_recv(&f, c->recv.buf, c->recv.len);
+		struct fish_packets_t * packets = fish_recv(&f, c->recv.buf, c->recv.len);
 
-		for (struct fish_packets * current = packets; current != NULL; current = current->next) {
-			struct fish_packet * packet = current->packet;
+		for (struct fish_packets_t * current = packets; current != NULL; current = current->next) {
+			struct fish_packet_t * packet = current->packet;
 
 			int sz = write(1, packet->data, packet->data_size);
 
