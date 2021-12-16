@@ -10,6 +10,10 @@
 #include <pty.h>
 #include <termios.h>
 #include <stdlib.h>
+#include <sys/ioctl.h>
+
+
+typedef int terminal_id_t;
 
 #else /* MG_ARCH_WIN32 */
 
@@ -19,10 +23,19 @@
 #include <winpty.h>
 #include <winpty_constants.h>
 
+typedef winpty_t * terminal_id_t;
+
 bool handle_agent_request(int argc, char * argv[]);
 
 #endif
 
-bool open_terminal(paper_t * in, paper_t * out);
+struct terminal_t {
+    terminal_id_t id;
+    paper_t in;
+    paper_t out;
+};
+
+bool open_terminal(struct terminal_t * terminal);
+bool set_terminal_size(struct terminal_t * terminal, int cols, int rows);
 
 #endif /* H_TERMINAL */

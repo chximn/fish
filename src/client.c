@@ -7,10 +7,15 @@
 
 #include <fish.h>
 
+#define CHANNEL_COMMAND 0x00
+#define CHANNEL_SHELL 0x01
+
+#define COMMAND_TERMINAL_SIZE 0x00
+
+struct fish f;
 bool done = false;
 bool init = false;
-bool welcomed = false;
-paper_t terminal_in, terminal_out;
+struct terminal_t terminal;
 
 void * __term_out2conn_thread(void * args) {
 	struct mg_connection * c = (struct mg_connection *) args;
@@ -18,7 +23,7 @@ void * __term_out2conn_thread(void * args) {
 	char buf[2048];
 	while(true) {
 		paper_size_t sz;
-		if (!paper_read(terminal_out, buf, sizeof(buf), &sz)) {
+		if (!paper_read(terminal.out, buf, sizeof(buf), &sz)) {
 			// disconnected
 			done = true;
 			// perror("ret < 0\n");
@@ -26,7 +31,8 @@ void * __term_out2conn_thread(void * args) {
 			break;
 		}
 		else if (sz > 0) {
-			mg_send(c, buf, sz);
+			fish_send(&f, CHANNEL_SHELL, buf, sz);
+			// mg_send(c, buf, sz);
 		}
 	}
 
@@ -35,9 +41,10 @@ void * __term_out2conn_thread(void * args) {
 
 void start_shell(struct mg_connection *c) {
 	// open terminal
-	if (!open_terminal(&terminal_in, &terminal_out)) {
+	if (!open_terminal(&terminal)) {
 		printf("Failed to open terminal!\n");
 	}
+
 	init = true;
 
 	// start thread to read from terminal's out
@@ -45,56 +52,73 @@ void start_shell(struct mg_connection *c) {
 	pthread_create(&thread, NULL, __term_out2conn_thread, c);
 }
 
+void handle_packet(struct fish_packet * packet) {
+	if (packet->channel == CHANNEL_SHELL) {
+		paper_size_t sz;
+		if (!paper_write(terminal.in, packet->data, packet->data_size, &sz) || sz < packet->data_size) {
+			printf("failed to write to terminal's in\n");
+		}
+	}
+
+	else if (packet->channel == CHANNEL_COMMAND) {
+		uint8_t command = *((uint8_t*)(packet->data));
+		
+		if (command == COMMAND_TERMINAL_SIZE) {
+			uint32_t data_size = sizeof(uint8_t) + 2 * sizeof(uint32_t);
+			if (packet->data_size != data_size) {
+				printf("invalid command packet size\n");
+				return;
+			}
+
+			uint32_t cols = *((uint32_t*)(packet->data + sizeof(uint8_t)));
+			uint32_t rows = *((uint32_t*)(packet->data + sizeof(uint8_t) + sizeof(uint32_t)));
+
+			// printf("got terminal size command w/ cols=%d rows=%d\n", cols, rows);
+			set_terminal_size(&terminal, cols, rows);
+		}
+
+		else {
+			printf("unkown command!\n");
+		}
+
+	}
+
+	else {
+		printf("Unkown channel!\n");
+	}
+}
+
 static void fn(struct mg_connection *c, int ev, void *ev_data, void *fn_data) {
 	if (ev == MG_EV_CONNECT) {
 		printf("connected!\n");
+		f.connection = c;
+		start_shell(c);
 	}
 	
 	else if (ev == MG_EV_READ) {
-		if (!welcomed) {
-			char * welcome = WELCOME_BYTES;
-			int l = strlen(welcome);
-			if (c->recv.len != l + 1) {
-				// not welcome :(
-				done = true;
+		if (!init) printf("fd not initialized!\n");
+		else {
+
+			struct fish_packets * packets = fish_recv(&f, c->recv.buf, c->recv.len);
+
+			for (struct fish_packets * current = packets; current != NULL; current = current->next) {
+				struct fish_packet * packet = current->packet;
+
+				handle_packet(packet);
 			}
 
-			else {
-				for (int i = 0; i < l; i++) {
-					if (c->recv.buf[i] != welcome[i]) {
-						// not welcome :(
-						done = true;
-						break;
-					}
-				}
-			}
-
-			if (!done) {
-				welcomed = true;
-				printf("welcomed!\n");
-				mg_iobuf_del(&c->recv, 0, c->recv.len);
-				start_shell(c);
-			}
-
-			else {
-				printf("not welcome :(\n");
-			}
-			
-			return;
-		}
-
-		if (welcomed) {
-			paper_size_t sz;
-			if (!init) printf("fd not initialized!\n");
-			else if (!paper_write(terminal_in, c->recv.buf, c->recv.len, &sz)) {
-				printf("failed to write to terminal's in\n");
-			}
-			else mg_iobuf_del(&c->recv, 0, c->recv.len);
+			fish_packets_free(packets);
+			mg_iobuf_del(&c->recv, 0, c->recv.len);
 		}
 	}
 	
 	else if (ev == MG_EV_ERROR) {
 		printf("error\n");
+	}
+
+	else if (ev == MG_EV_CLOSE) {
+		done = true;
+		printf("disconnected2!\n");
 	}
 }
 
@@ -118,17 +142,7 @@ int main(int argc, char *argv[]) {
 	mg_mgr_init(&mgr);                                       // Initialise event manager
 	mg_connect(&mgr, endpoint, fn, &mgr); // Create client connection
 	
-	int time_elapsed = 0;
-	while(!done) {
-		if (!welcomed) {
-			if (time_elapsed > 10000) {
-				printf("welcome timeout!\n");
-				break;
-			}
-			else time_elapsed += 10;
-		}
-		mg_mgr_poll(&mgr, 10);
-	}                     
+	while(!done) mg_mgr_poll(&mgr, 10);
 	mg_mgr_free(&mgr);                                       // Free resources
 	return 0;
 }

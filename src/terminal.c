@@ -2,7 +2,7 @@
 
 #if MG_ARCH == MG_ARCH_UNIX
 
-bool open_terminal(paper_t * in, paper_t * out) {
+bool open_terminal(struct terminal_t * terminal) {
 	int fd;
     struct termios *term = NULL;
     struct winsize *win = NULL;
@@ -17,9 +17,17 @@ bool open_terminal(paper_t * in, paper_t * out) {
         abort();
     }
 
-    *in = fd;
-    *out = fd;
+    terminal->id = fd;
+    terminal->in = (paper_t) fd;
+    terminal->out = (paper_t) fd;
 	return true;
+}
+
+bool set_terminal_size(struct terminal_t * terminal, int cols, int rows) {
+    struct winsize ws;
+    ws.ws_col = cols;
+    ws.ws_row = rows;
+    return ioctl(terminal->id, TIOCSWINSZ, &ws) >= 0;
 }
 
 #else /* MG_ARCH_WIN32 */
@@ -36,7 +44,7 @@ bool handle_agent_request(int argc, char * argv[]) {
     return false;
 }
 
-bool open_terminal(paper_t * in, paper_t * out) {
+bool open_terminal(struct terminal_t * terminal) {
 
     winpty_error_ptr_t err;
     winpty_config_t * agentCfg = winpty_config_new(0, &err);
@@ -81,8 +89,9 @@ bool open_terminal(paper_t * in, paper_t * out) {
         return false;
     }
 
-    *in = (paper_t *) conin;
-    *out = (paper_t *) conout;
+    terminal->id = pty;
+    terminal->in = (paper_t) conin;
+    terminal->out = (paper_t) conout;
 
     // TODO: to be added in a seperate function
     // CloseHandle(process);
@@ -92,4 +101,9 @@ bool open_terminal(paper_t * in, paper_t * out) {
 
     return true;
 }
+
+bool set_terminal_size(struct terminal_t * terminal, int cols, int rows) {
+    return winpty_set_size(terminal->id, cols, rows, NULL);
+}
+
 #endif
