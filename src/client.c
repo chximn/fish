@@ -7,32 +7,27 @@
 
 #include <fish.h>
 
-#define CHANNEL_COMMAND 0x00
-#define CHANNEL_SHELL 0x01
+#include <constants.h>
 
-#define COMMAND_TERMINAL_SIZE 0x00
 
 struct fish_t f;
 bool done = false;
 bool init = false;
 struct terminal_t terminal;
 
+
 void * __term_out2conn_thread(void * args) {
-	struct mg_connection * c = (struct mg_connection *) args;
 
 	char buf[2048];
 	while(true) {
-		paper_size_t sz;
+		paper_size_t sz = 0;
 		if (!paper_read(terminal.out, buf, sizeof(buf), &sz)) {
-			// disconnected
 			done = true;
-			// perror("ret < 0\n");
-			printf("disconnected!\n");
+			printf("cant read from pty's stdout!\n");
 			break;
 		}
 		else if (sz > 0) {
 			fish_send(&f, CHANNEL_SHELL, buf, sz);
-			// mg_send(c, buf, sz);
 		}
 	}
 
@@ -41,7 +36,7 @@ void * __term_out2conn_thread(void * args) {
 
 void start_shell(struct mg_connection *c) {
 	// open terminal
-	if (!open_terminal(&terminal)) {
+	if (!terminal_open(&terminal)) {
 		printf("Failed to open terminal!\n");
 	}
 
@@ -54,6 +49,7 @@ void start_shell(struct mg_connection *c) {
 
 void handle_packet(struct fish_packet_t * packet) {
 	if (packet->channel == CHANNEL_SHELL) {
+
 		paper_size_t sz;
 		if (!paper_write(terminal.in, packet->data, packet->data_size, &sz) || sz < packet->data_size) {
 			printf("failed to write to terminal's in\n");
@@ -64,6 +60,7 @@ void handle_packet(struct fish_packet_t * packet) {
 		uint8_t command = *((uint8_t*)(packet->data));
 		
 		if (command == COMMAND_TERMINAL_SIZE) {
+
 			uint32_t data_size = sizeof(uint8_t) + 2 * sizeof(uint32_t);
 			if (packet->data_size != data_size) {
 				printf("invalid command packet size\n");
@@ -74,7 +71,7 @@ void handle_packet(struct fish_packet_t * packet) {
 			uint32_t rows = *((uint32_t*)(packet->data + sizeof(uint8_t) + sizeof(uint32_t)));
 
 			// printf("got terminal size command w/ cols=%d rows=%d\n", cols, rows);
-			set_terminal_size(&terminal, cols, rows);
+			terminal_set_size(&terminal, cols, rows);
 		}
 
 		else {
@@ -92,6 +89,7 @@ static void fn(struct mg_connection *c, int ev, void *ev_data, void *fn_data) {
 	if (ev == MG_EV_CONNECT) {
 		printf("connected!\n");
 		f.connection = c;
+
 		start_shell(c);
 	}
 	
@@ -118,7 +116,7 @@ static void fn(struct mg_connection *c, int ev, void *ev_data, void *fn_data) {
 
 	else if (ev == MG_EV_CLOSE) {
 		done = true;
-		printf("disconnected2!\n");
+		printf("disconnected!\n");
 	}
 }
 

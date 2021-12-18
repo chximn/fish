@@ -13,37 +13,29 @@
 
 #include <fish.h>
 
-
-#define CHANNEL_COMMAND 0x00
-#define CHANNEL_SHELL 0x01
-
-#define COMMAND_TERMINAL_SIZE 0x00
+#include <constants.h>
 
 bool done = false;
-struct mg_connection * connection = NULL;
 struct fish_t f;
 
 void * __stdin2conn_thread(void * args) {
-	struct mg_connection * c = (struct mg_connection *) args;
-
 	char buf[2048];
 	while(!done) {
-		paper_size_t sz;
+
+		paper_size_t sz = 0;
 		if (!paper_read(0, buf, sizeof(buf), &sz)) {
 			continue;
 		}
-		else if (sz > 0) {
 
-			fish_send(&f, CHANNEL_SHELL, buf, sz); 
-			// fish_send(c, buf, sz);
-			// mg_send(c, buf, sz);
+		else if (sz > 0) {
+			fish_send(&f, CHANNEL_SHELL, buf, sz);
 		}
 	}
 
 	return NULL;
 }
 
-void set_terminal_size(uint32_t cols, uint32_t rows) {
+void terminal_set_size(uint32_t cols, uint32_t rows) {
 	uint32_t buffer_size = sizeof(uint8_t) + 2 * sizeof(uint32_t);
 	uint8_t buffer[buffer_size];
 
@@ -57,25 +49,33 @@ void set_terminal_size(uint32_t cols, uint32_t rows) {
 void terminal_size_handler(int sig) {
 	struct winsize ws;
 	ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
+	terminal_set_size(ws.ws_col, ws.ws_row);
+}
 
-	set_terminal_size(ws.ws_col, ws.ws_row);
+void handle_packet(struct fish_packet_t * packet) {
+	if (packet->channel == CHANNEL_SHELL) {
+		int sz = write(1, packet->data, packet->data_size);
+
+		if (sz < packet->data_size) {
+			printf("failed to write to stdout\n");
+		}
+	}
 }
 
 static void fn(struct mg_connection *c, int ev, void *ev_data, void *fn_data) {
 	if (ev == MG_EV_ACCEPT) {
 		// ignore new connection if we already have one
-		if (connection != NULL) {
+		if (f.connection != NULL) {
 			c->is_closing = 1;
 		}
 
 		else {
 			// connected
-			connection = c;
 			f.connection = c;
 			terminal_size_handler(SIGWINCH);
 			system("stty raw -echo");
-			pthread_t thread;
-			pthread_create(&thread, NULL, __stdin2conn_thread, c);
+			pthread_t stdin2conn_thread;
+			pthread_create(&stdin2conn_thread, NULL, __stdin2conn_thread, NULL);
 		}
 	}
 	
@@ -85,11 +85,7 @@ static void fn(struct mg_connection *c, int ev, void *ev_data, void *fn_data) {
 		for (struct fish_packets_t * current = packets; current != NULL; current = current->next) {
 			struct fish_packet_t * packet = current->packet;
 
-			int sz = write(1, packet->data, packet->data_size);
-
-			if (sz < packet->data_size) {
-				printf("failed to write to stdout\n");
-			}
+			handle_packet(packet);
 		}
 
 		fish_packets_free(packets);
@@ -102,7 +98,7 @@ static void fn(struct mg_connection *c, int ev, void *ev_data, void *fn_data) {
 	}
 
 	else if (ev == MG_EV_CLOSE) {
-		if (c == connection) {
+		if (c == f.connection) {
 			done = true;
 			system("stty sane");
 		}
@@ -123,7 +119,7 @@ int main(int argc, char *argv[]) {
 	struct mg_mgr mgr;
 	mg_log_set("0"); 
 	mg_mgr_init(&mgr);                                // Init manager
-	mg_listen(&mgr, endpoint, fn, &mgr);  // Setup listener
+	mg_listen(&mgr, endpoint, fn, &mgr);              // Setup listener
 	while (!done) mg_mgr_poll(&mgr, 10);              // Event loop
 	mg_mgr_free(&mgr);                                // Cleanup
 

@@ -12,8 +12,12 @@
 #include <stdlib.h>
 #include <sys/ioctl.h>
 
-
-typedef int terminal_id_t;
+struct terminal_t {
+    int fd;
+    pid_t pid;
+    paper_t in;
+    paper_t out;
+};
 
 #else /* MG_ARCH_WIN32 */
 
@@ -23,19 +27,19 @@ typedef int terminal_id_t;
 #include <winpty.h>
 #include <winpty_constants.h>
 
-typedef winpty_t * terminal_id_t;
+struct terminal_t {
+    winpty_t * pty;
+    HANDLE process;
+    paper_t in;
+    paper_t out;
+};
 
 bool handle_agent_request(int argc, char * argv[]);
 
 #endif
 
-struct terminal_t {
-    terminal_id_t id;
-    paper_t in;
-    paper_t out;
-};
-
-bool open_terminal(struct terminal_t * terminal);
-bool set_terminal_size(struct terminal_t * terminal, int cols, int rows);
+bool terminal_open(struct terminal_t * terminal);
+bool terminal_set_size(struct terminal_t * terminal, int cols, int rows);
+void terminal_close(struct terminal_t * terminal);
 
 #endif /* H_TERMINAL */

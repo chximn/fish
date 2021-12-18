@@ -2,7 +2,7 @@
 
 #if MG_ARCH == MG_ARCH_UNIX
 
-bool open_terminal(struct terminal_t * terminal) {
+bool terminal_open(struct terminal_t * terminal) {
 	int fd;
     struct termios *term = NULL;
     struct winsize *win = NULL;
@@ -17,17 +17,23 @@ bool open_terminal(struct terminal_t * terminal) {
         abort();
     }
 
-    terminal->id = fd;
+    terminal->fd = fd;
+    terminal->pid = childpid;
     terminal->in = (paper_t) fd;
     terminal->out = (paper_t) fd;
 	return true;
 }
 
-bool set_terminal_size(struct terminal_t * terminal, int cols, int rows) {
+bool terminal_set_size(struct terminal_t * terminal, int cols, int rows) {
     struct winsize ws;
     ws.ws_col = cols;
     ws.ws_row = rows;
-    return ioctl(terminal->id, TIOCSWINSZ, &ws) >= 0;
+    return ioctl(terminal->fd, TIOCSWINSZ, &ws) >= 0;
+}
+
+void terminal_close(struct terminal_t * terminal) {
+    kill(terminal->pid, SIGKILL);
+    close(terminal->fd);
 }
 
 #else /* MG_ARCH_WIN32 */
@@ -44,7 +50,7 @@ bool handle_agent_request(int argc, char * argv[]) {
     return false;
 }
 
-bool open_terminal(struct terminal_t * terminal) {
+bool terminal_open(struct terminal_t * terminal) {
 
     winpty_error_ptr_t err;
     winpty_config_t * agentCfg = winpty_config_new(0, &err);
@@ -89,21 +95,23 @@ bool open_terminal(struct terminal_t * terminal) {
         return false;
     }
 
-    terminal->id = pty;
+    terminal->pty = pty;
+    terminal->process = process;
     terminal->in = (paper_t) conin;
     terminal->out = (paper_t) conout;
-
-    // TODO: to be added in a seperate function
-    // CloseHandle(process);
-    // CloseHandle(conin);
-    // CloseHandle(conout);
-    // winpty_free(pty);
 
     return true;
 }
 
-bool set_terminal_size(struct terminal_t * terminal, int cols, int rows) {
-    return winpty_set_size(terminal->id, cols, rows, NULL);
+bool terminal_set_size(struct terminal_t * terminal, int cols, int rows) {
+    return winpty_set_size(terminal->pty, cols, rows, NULL);
+}
+
+void terminal_close(struct terminal_t * terminal) {
+    CloseHandle(terminal->process);
+    CloseHandle(terminal->in);
+    CloseHandle(terminal->out);
+    winpty_free(terminal->pty);
 }
 
 #endif
