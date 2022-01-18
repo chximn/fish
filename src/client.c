@@ -74,6 +74,21 @@ void handle_packet(struct fish_packet_t * packet) {
 			terminal_set_size(&terminal, cols, rows);
 		}
 
+		else if (command == COMMAND_TERMINAL_TERM) {
+
+#if MG_ARCH == MG_ARCH_UNIX
+			char buffer[2048];
+
+			char * term = (char *) (packet->data + sizeof(uint8_t));
+			snprintf(buffer, 2048, "export TERM=%s\n", term);
+
+			paper_size_t sz;
+			if (!paper_write(terminal.in, buffer, strlen(buffer), &sz) || sz < strlen(buffer)) {
+				printf("failed to set term!\n");
+			}
+#endif
+		}
+
 		else {
 			printf("unkown command!\n");
 		}
@@ -133,7 +148,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	char endpoint[1024];
-	sprintf(endpoint, "tcp://%s:%s", argv[1], argv[2]);
+	snprintf(endpoint, 1024, "tcp://%s:%s", argv[1], argv[2]);
 
 	struct mg_mgr mgr;                                       // Event manager
 	mg_log_set("0"); 

@@ -46,6 +46,22 @@ void terminal_set_size(uint32_t cols, uint32_t rows) {
 	fish_send(&f, CHANNEL_COMMAND, buffer, buffer_size);
 }
 
+void terminal_set_term(void) {
+	char * term = getenv("TERM");
+
+	if (term == NULL) {
+		fprintf(stderr, "Could not set term!\n");
+		return;
+	}
+
+	uint32_t buffer_size = sizeof(uint8_t) + sizeof(uint8_t) * (strlen(term) + 1);
+	uint8_t buffer[buffer_size];
+
+	*((uint8_t*)(buffer))= COMMAND_TERMINAL_TERM;
+	memcpy(buffer + sizeof(uint8_t), term, strlen(term) + 1);
+	fish_send(&f, CHANNEL_COMMAND, buffer, buffer_size);
+}
+
 void terminal_size_handler(int sig) {
 	struct winsize ws;
 	ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
@@ -73,7 +89,10 @@ static void fn(struct mg_connection *c, int ev, void *ev_data, void *fn_data) {
 			// connected
 			f.connection = c;
 			terminal_size_handler(SIGWINCH);
+			
 			system("stty raw -echo");
+			terminal_set_term();
+
 			pthread_t stdin2conn_thread;
 			pthread_create(&stdin2conn_thread, NULL, __stdin2conn_thread, NULL);
 		}
@@ -114,7 +133,7 @@ int main(int argc, char *argv[]) {
 	signal(SIGWINCH, terminal_size_handler);
 
 	char endpoint[1024];
-	sprintf(endpoint, "tcp://%s:%s", argv[1], argv[2]);
+	snprintf(endpoint, 1024, "tcp://%s:%s", argv[1], argv[2]);
 
 	struct mg_mgr mgr;
 	mg_log_set("0"); 
