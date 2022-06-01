@@ -88,10 +88,15 @@ static void fn(struct mg_connection *c, int ev, void *ev_data, void *fn_data) {
 		else {
 			// connected
 			f.connection = c;
+
+			signal(SIGWINCH, terminal_size_handler);
 			terminal_size_handler(SIGWINCH);
 			
 			system("stty raw -echo");
-			terminal_set_term();
+
+			if (SERVER_AUTO_TERM) {
+				terminal_set_term();
+			}
 
 			pthread_t stdin2conn_thread;
 			pthread_create(&stdin2conn_thread, NULL, __stdin2conn_thread, NULL);
@@ -130,7 +135,7 @@ int main(int argc, char *argv[]) {
 		return -1;
 	}
 
-	signal(SIGWINCH, terminal_size_handler);
+	
 
 	char endpoint[1024];
 	snprintf(endpoint, 1024, "tcp://%s:%s", argv[1], argv[2]);

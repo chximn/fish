@@ -7,4 +7,6 @@
 #define COMMAND_TERMINAL_TERM  0x00
 #define COMMAND_TERMINAL_SIZE  0x01
 
+#define SERVER_AUTO_TERM 0x1
+
 #endif
