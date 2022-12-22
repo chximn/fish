@@ -1,4 +1,4 @@
-# Fully Interactive Shell
+# Fully Interactive SHell
 
 ## Dependencies
 ...
