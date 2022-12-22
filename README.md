@@ -8,4 +8,4 @@
 * Windows 10 does not support Crtl+C on child processes (Maybe use conpty as an alternative)
 
 ## To be done
-* Install Winpty as a dependencies (From Git from example)
+* Install Winpty,Mongoose as a dependencies (From Git from example)
