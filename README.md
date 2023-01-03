@@ -12,8 +12,6 @@ In the victim machine, launch the client executable (both unix and windows versi
 $ client <server_address> <server_port>
 ```
 
-[![asciicast](https://asciinema.org/a/sdGg38QO0R850KnJjzYA6iv5J.svg)](https://asciinema.org/a/sdGg38QO0R850KnJjzYA6iv5J)
-
 ## Build
 This tool should be compiled on a unix machine and it is dependant on the following packages.
 Just run `make` after installing the dependencies.
